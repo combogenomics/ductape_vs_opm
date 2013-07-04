@@ -1,0 +1,157 @@
+#!/usr/bin/python
+'''
+Confront the parameters extracted by opm and DuctApe
+'''
+
+db = 'ductape.db'
+db_vaas  = 'opm.db'
+
+dp = {'lambda' : 'lag',
+        'mu' : 'slope',
+        'A' : 'max',
+        'AUC' : 'area'}
+        
+colorparam = {'lag' : 'blue',
+        'slope' : 'red',
+        'max' : 'green',
+        'area' : 'black'}
+
+dPlates = {'PM01':'PM01', 'PM02':'PM02A',
+            'PM03':'PM03B', 'PM04':'PM04A',
+            'PM05':'PM05', 'PM06':'PM06',
+            'PM07':'PM07', 'PM08':'PM08',
+            'PM09':'PM09', 'PM10':'PM10',
+            'PM11':'PM11C', 'PM12':'PM12B',
+            'PM13':'PM13B', 'PM14':'PM14A',
+            'PM15':'PM15B', 'PM16':'PM16A',
+            'PM17':'PM17A', 'PM18':'PM18C',
+            'PM19':'PM19', 'PM20':'PM20B',
+            'PM01-':'PM01', 'PM02-A':'PM02',
+            'PM03-B':'PM03B','PM04-A':'PM04A',
+            'PM05-':'PM05', 'PM06-':'PM06',
+            'PM07-':'PM07','PM08-':'PM08',
+            'PM09-':'PM09'}
+
+from ductape.storage.SQLite.database import Biolog
+from ductape.phenome.biolog import getPlates, Experiment
+from ductape.common.utils import smooth, compress
+from ductape.phenome.fitting import logistic, gompertz, richards
+
+biolog = Biolog(db_vaas)
+
+sigs = [s for s in biolog.getAllSignals()]
+plates = [p for p in getPlates(sigs, nonmean=True)]
+
+isZero = biolog.atLeastOneZeroSubtracted()
+vaas = Experiment(plates=plates, zero=isZero)
+
+biolog = Biolog(db)
+
+sigs = [s for s in biolog.getAllSignals()]
+plates = [p for p in getPlates(sigs, nonmean=True)]
+
+isZero = biolog.atLeastOneZeroSubtracted()
+exp = Experiment(plates=plates, zero=isZero)
+
+def getWells():
+    wellChars = 'ABCDEFGH'
+    for wh in wellChars:
+            for wi in range(1,13):
+                if wi < 10:
+                    wid = '%s0%d'%(wh, wi)
+                else:
+                    wid = '%s%d'%(wh, wi)
+                yield wid
+
+ddiff = {}
+pdiff = {}
+
+import matplotlib.pyplot as plt
+fig = plt.figure()
+
+for param in dp.values():
+    ddiff[param] = []
+    pdiff[param] = {}
+    
+    for well in exp.getWells():
+        pid = well.plate_id
+        wid = well.well_id
+        orgid = well.strain
+        if pid not in pdiff[param]:
+            pdiff[param][pid] = []
+        diffs = []
+        
+        # Discard the low activity wells
+        if well.activity <= 2:continue
+        # Discard the wells where no fitting was possible
+        if exp.experiment[pid][wid][orgid][1].model is None:
+            continue
+             
+        v1 = getattr(vaas.experiment[pid][wid][orgid][1], param)
+        v2 = getattr(exp.experiment[pid][wid][orgid][1], param)
+        
+        v1 + 1
+        v2 + 2
+
+        try:
+            diff = float(v1 - v2) / v2
+        except ZeroDivisionError:
+            continue
+            
+        diffs.append(diff)
+        ddiff[param].append(diff)
+        pdiff[param][pid].append(diff)
+
+from ductape.actions import colorBoxPlot
+
+fig = plt.figure(figsize=(30,18))
+
+# Total
+ax = plt.subplot2grid((6,4), (0,0), colspan=4)
+for param in sorted(dp.values()):
+    value = []
+    color = []
+    for param in sorted(dp.values()):
+        value.append(ddiff[param])
+        color.append(colorparam[param])
+    
+    bplot=ax.boxplot(value,1)
+    colorBoxPlot(ax, bplot, color)
+
+    ax.set_xticklabels(sorted(dp.values()), size='small')
+    ax.set_title('Overall')
+    
+    ax.set_ylabel('Relative difference', size='small')
+    
+    ax.yaxis.grid(color='gray', linestyle='dashed')
+    ax.set_ylim(-1,1)
+
+# Each plate
+rid = 1
+cid = 0
+for pid in sorted(pdiff['area'].keys()):
+    ax = plt.subplot2grid((6,4), (rid,cid))
+    
+    value = []
+    color = []
+    for param in sorted(dp.values()):
+        value.append(pdiff[param][pid])
+        color.append(colorparam[param])
+    
+    bplot=ax.boxplot(value,1)
+    colorBoxPlot(ax, bplot, color)
+    ax.set_xticklabels(sorted(dp.values()), size='x-small')
+    ax.set_title(pid)
+    
+    ax.set_ylabel('Relative difference', size='x-small')
+    
+    ax.yaxis.grid(color='gray', linestyle='dashed')
+    ax.set_ylim(-1,1)
+    
+    cid += 1
+    if cid == 4:
+        cid = 0
+        rid += 1
+
+plt.savefig('differences.png')
+

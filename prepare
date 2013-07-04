@@ -1,0 +1,18 @@
+#!/bin/bash
+
+# Launch opm.R inside the R prompt (or RStudio)
+# source('opm.R')
+# Import the results of opm inside a DuctApe project
+dape -p opm.db init
+dape -p opm.db add-multi Rm1021 AK83 AK58 BL225C
+for i in $(ls | grep yml)
+do
+    org=$(echo $i | awk 'BEGIN { FS = "_" } ; {print $2}' | awk 'BEGIN { FS = "." } ; {print $1}')
+    dphenome -p opm.db add $i $org
+done
+# Import and analyze the PM data inside DuctApe
+dape init
+dape add-multi Rm1021 AK83 AK58 BL225C
+dphenome add-multi all.csv
+# Calculate the parameters and clusterize (AV max 4)
+dphenome start -g -n 5
