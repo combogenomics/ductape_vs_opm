@@ -28,4 +28,5 @@ Details
 
 The comparison is made between those curves having AV >= 3 (AV max 4), according to DuctApe.
 This is done to minimize the impact of small differences in very low curves, then concentrating the analysis on significative differences.
+
 The difference between two parameters is defined as (Vo - Vd)/Vd, where Vo and Vd are the parameters estimated by opm and DuctApe, respectively.
