@@ -6,12 +6,15 @@ Confront the parameters extracted by opm and DuctApe
 db = 'ductape.db'
 db_vaas  = 'opm.db'
 
-dp = {'lambda' : 'lag',
+par = ['AV', 'area', 'max', 'lag', 'slope']
+dp = {  'lambda' : 'lag',
         'mu' : 'slope',
         'A' : 'max',
         'AUC' : 'area'}
         
-colorparam = {'lag' : 'blue',
+colorparam = {
+        'AV' : 'orange',
+        'lag' : 'blue',
         'slope' : 'red',
         'max' : 'green',
         'area' : 'black'}
@@ -44,6 +47,18 @@ plates = [p for p in getPlates(sigs, nonmean=True)]
 
 isZero = biolog.atLeastOneZeroSubtracted()
 vaas = Experiment(plates=plates, zero=isZero)
+# Confront also the AV
+# Remove the parameters with value sway out of the norm
+from copy import deepcopy
+plates2 = deepcopy(plates)
+for p in plates2:
+    for w in p.getWells():
+        if w.lag > 70 or w.lag < 0:
+            w.lag = 0
+        if w.slope > 30:
+            w.slope = 0
+vaas2 = Experiment(plates=plates2, zero=isZero)
+vaas2.clusterize(n_clusters=5)
 
 biolog = Biolog(db)
 
@@ -52,6 +67,26 @@ plates = [p for p in getPlates(sigs, nonmean=True)]
 
 isZero = biolog.atLeastOneZeroSubtracted()
 exp = Experiment(plates=plates, zero=isZero)
+
+# Compare the AVs
+AVdiffs = []
+ddiff = {}
+pdiff = {}
+
+ddiff['AV'] = []
+pdiff['AV'] = {}
+
+for w in vaas2.getWells():
+    if w.plate_id not in pdiff['AV']:
+        pdiff['AV'][w.plate_id] = []
+
+    av1 = w.activity
+    av2 = exp.experiment[w.plate_id][w.well_id][w.strain][w.replica].activity
+    diff = float(av1 - av2)/4
+
+    AVdiffs.append(diff)
+    ddiff['AV'].append(diff)
+    pdiff['AV'][w.plate_id].append(diff)
 
 def getWells():
     wellChars = 'ABCDEFGH'
@@ -62,9 +97,6 @@ def getWells():
                 else:
                     wid = '%s%d'%(wh, wi)
                 yield wid
-
-ddiff = {}
-pdiff = {}
 
 import matplotlib.pyplot as plt
 fig = plt.figure()
@@ -86,17 +118,11 @@ for param in dp.values():
         # Discard the wells where no fitting was possible
         if exp.experiment[pid][wid][orgid][1].model is None:
             continue
-             
-        v1 = getattr(vaas.experiment[pid][wid][orgid][1], param)
-        v2 = getattr(exp.experiment[pid][wid][orgid][1], param)
-        
-        v1 + 1
-        v2 + 2
+         
+        v1 = vaas.normalizeParam(param, getattr(vaas.experiment[pid][wid][orgid][1], param))
+        v2 = exp.normalizeParam(param, getattr(exp.experiment[pid][wid][orgid][1], param))
 
-        try:
-            diff = float(v1 - v2) / v2
-        except ZeroDivisionError:
-            continue
+        diff = v1 - v2
             
         diffs.append(diff)
         ddiff[param].append(diff)
@@ -108,42 +134,41 @@ fig = plt.figure(figsize=(30,18))
 
 # Total
 ax = plt.subplot2grid((6,4), (0,0), colspan=4)
-for param in sorted(dp.values()):
-    value = []
-    color = []
-    for param in sorted(dp.values()):
-        value.append(ddiff[param])
-        color.append(colorparam[param])
+value = []
+color = []
+for param in par:
+    value.append(ddiff[param])
+    color.append(colorparam[param])
     
-    bplot=ax.boxplot(value,1)
-    colorBoxPlot(ax, bplot, color)
+bplot=ax.boxplot(value,1)
+colorBoxPlot(ax, bplot, color)
 
-    ax.set_xticklabels(sorted(dp.values()), size='small')
-    ax.set_title('Overall')
+ax.set_xticklabels(par, size='small')
+ax.set_title('Overall')
     
-    ax.set_ylabel('Relative difference', size='small')
+ax.set_ylabel('Normalized difference', size='small')
     
-    ax.yaxis.grid(color='gray', linestyle='dashed')
-    ax.set_ylim(-1,1)
+ax.yaxis.grid(color='gray', linestyle='dashed')
+ax.set_ylim(-1,1)
 
 # Each plate
 rid = 1
 cid = 0
-for pid in sorted(pdiff['area'].keys()):
+for pid in sorted(pdiff['AV'].keys()):
     ax = plt.subplot2grid((6,4), (rid,cid))
     
     value = []
     color = []
-    for param in sorted(dp.values()):
+    for param in par:
         value.append(pdiff[param][pid])
         color.append(colorparam[param])
     
     bplot=ax.boxplot(value,1)
     colorBoxPlot(ax, bplot, color)
-    ax.set_xticklabels(sorted(dp.values()), size='x-small')
+    ax.set_xticklabels(par, size='x-small')
     ax.set_title(pid)
     
-    ax.set_ylabel('Relative difference', size='x-small')
+    ax.set_ylabel('Normalized difference', size='x-small')
     
     ax.yaxis.grid(color='gray', linestyle='dashed')
     ax.set_ylim(-1,1)
@@ -153,5 +178,4 @@ for pid in sorted(pdiff['area'].keys()):
         cid = 0
         rid += 1
 
-plt.savefig('differences.png')
-
+plt.savefig('differences.pdf')
