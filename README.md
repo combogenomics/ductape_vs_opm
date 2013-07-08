@@ -8,7 +8,7 @@ Requirements
 ------------
 
 * opm v0.9.1 or later
-* DuctApe v0.9.0 or later
+* DuctApe v0.9.2 or later
 
 Howto
 -----
