@@ -101,6 +101,26 @@ def getWells():
 import matplotlib.pyplot as plt
 fig = plt.figure()
 
+# Maximum values for each param, for proper normalization
+maxpar = {}
+
+for param in dp.values():
+    if param not in maxpar:
+        maxpar[param] = -100
+    
+    for well in exp.getWells():
+        pid = well.plate_id
+        wid = well.well_id
+        orgid = well.strain
+        
+        v1 = getattr(vaas.experiment[pid][wid][orgid][1], param)
+        if v1 > maxpar[param]:
+            maxpar[param] = v1
+
+        v2 = getattr(exp.experiment[pid][wid][orgid][1], param)
+        if v2 > maxpar[param]:
+            maxpar[param] = v2
+
 for param in dp.values():
     ddiff[param] = []
     pdiff[param] = {}
@@ -119,8 +139,8 @@ for param in dp.values():
         if exp.experiment[pid][wid][orgid][1].model is None:
             continue
          
-        v1 = vaas.normalizeParam(param, getattr(vaas.experiment[pid][wid][orgid][1], param))
-        v2 = exp.normalizeParam(param, getattr(exp.experiment[pid][wid][orgid][1], param))
+        v1 = getattr(vaas.experiment[pid][wid][orgid][1], param) / maxpar[param]
+        v2 = getattr(exp.experiment[pid][wid][orgid][1], param) / maxpar[param]
 
         diff = v1 - v2
             
