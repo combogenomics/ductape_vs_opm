@@ -37,14 +37,14 @@ Z. mobilis dataset
 
 The dataset from *Z. mobilis* ZM4 is used to understand wether DuctApe and opm can come to similar biological conclusions.
 
-From the zmobilis command line:
+From the zmobilis folder:
+
+* ./prepare
 
 Open [RStudio](http://www.rstudio.com/) or enter the R prompt
 
 * source('opm.R')
 
-From the command line
-
-* ./prepare
+Again from the command line
 
 * ./compare
