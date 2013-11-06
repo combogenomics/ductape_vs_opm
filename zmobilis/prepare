@@ -1,0 +1,16 @@
+#!/bin/bash
+
+# Load the data inside DuctApe to perform a zero subtraction
+dape init
+dape add ZM4
+dphenome add all.csv ZM4
+dphenome zero
+dphenome start -g -n 6
+# Export the data in json format for opm
+dphenome export -j
+# DuctApe is ready
+mv phenome_avg_ZM4.tsv ductape.tsv
+
+# Launch opm.R inside the R prompt (or RStudio)
+# source('opm.R')
+# Import the results of opm inside a DuctApe project
